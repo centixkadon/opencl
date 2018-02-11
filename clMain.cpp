@@ -79,8 +79,11 @@ int main() {
       cout << "clTest     : ========== NEW ==========" << endl;
       TIME_A(time);
 
-      for (uint32_t i = 0; i < n; ++i) { a[i] = b[i] = c[i] = -1; }
-      cout << "clTest     : array init (-1, -1, -1)" << endl;
+      for (uint32_t i = 0; i < n; ++i) { b[i] = i, c[i] = 0; }
+      TIME_A(init1);
+      for (uint32_t i = 0; i < n; ++i) { a[i] = 1; }
+      cout << "clTest     : array init (a 1)" << endl;
+      TIME_B(init1);
 
       Buffer bufferA(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | bufferArgs.first, n * sizeof(int32_t), bufferArgs.second);
       Buffer bufferB(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(int32_t), b);
@@ -112,10 +115,10 @@ int main() {
       else
         cout << "clTestMap  : a_ not_eq a" << endl;
 
-      TIME_A(init);
-      for (uint32_t i = 0; i < n; ++i) { b[i] = c[i] = i, a[i] = 1, a_[i] = 2; }
-      cout << "clTest     : array init (i, i, i)" << endl;
-      TIME_B(init);
+      TIME_A(init2);
+      for (uint32_t i = 0; i < n; ++i) { a_[i] = 2; }
+      cout << "clTest     : array init (a_ 2)" << endl;
+      TIME_B(init2);
 
       commandQueue.enqueueNDRangeKernel(kernel, 0, n);
 
@@ -135,7 +138,8 @@ int main() {
         cout << "clTest     : result match b+a_" << endl;
       } else {
         cerr << "\e[1;31mclTestError: result not match\e[0m" << endl;
-        // cerr << "\e[1;31mclTestError: i/(a, b, c) = " << i << "/(" << a[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
+        uint32_t i = 100;
+        cerr << "\e[1;31mclTestError: i(a/a_, b, c) = " << i << "(" << a[i] << "/" << a_[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
       }
       // clArrayTest(a, b, c, n, [](int32_t a, int32_t b, int32_t c, int32_t i) { return (a + b == c); });
 
