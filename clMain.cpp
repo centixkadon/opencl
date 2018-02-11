@@ -16,17 +16,17 @@ using namespace cl;
 using namespace std;
 
 template <typename _Ty, typename _Fn>
-void clArrayTest(_Ty * a, _Ty * b, _Ty * c, uint32_t const n, _Fn & f) {
+void clArrayTest(_Ty * a, _Ty * b, _Ty * c, uint32_t n, _Fn f) {
   for (uint32_t i = 0; i < n; ++i) {
     if (f(a[i], b[i], c[i], i)) {
-      cout << "clTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")" endl;
+      cout << "clTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")" << endl;
       break;
     }
   }
 }
 
 template <typename _Ty, typename _Fn>
-void clArrayInit(_Ty * a, _Ty * b, _Ty * c, uint32_t const n, _Fn & f) {
+void clArrayInit(_Ty * a, _Ty * b, _Ty * c, uint32_t n, _Fn f) {
   for (uint32_t i = 0; i < n; ++i) {
     auto v = f(i);
     while (v.size() < 3) v.push_back(v[v.size() - 1]);
@@ -72,19 +72,18 @@ int main() {
       cout << "clDeviceMaxWorkGroupSize: " << device.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << endl;
     }
 
-    //uint32_t const n = 1000001;
-    uint32_t const n = 100000001;
+    uint32_t const n = 1000001;
+    //uint32_t const n = 100000001;
     int32_t * a = new int32_t[n];
     int32_t * b = new int32_t[n];
     int32_t * c = new int32_t[n];
-    int32_t val = -2;
 
     TIME_A(zero);
     TIME_B(zero);
 
     Context context(devices);
 
-    vector<pair<cl_mem_flags, int32_t *>> bufferArgses = {
+    vector<pair<uint64_t, int32_t *>> bufferArgses = {
         {CL_MEM_USE_HOST_PTR, a},
         {CL_MEM_ALLOC_HOST_PTR, a},
         {CL_MEM_ALLOC_HOST_PTR, nullptr},
@@ -134,7 +133,7 @@ int main() {
 
       commandQueue.enqueueNDRangeKernel(kernel, 0, n);
 
-      clArrayInit(a, b, c, n, [](int32_t i) { return vector<int32_t>{i, 2, 0}; });
+      clArrayInit(a, b, c, n, [](int32_t i) { return vector<int32_t>{0, 0, 0}; });
       cout << "clTest     : array init (i, 2, 0)" << endl;
 
       commandQueue.enqueueReadBuffer(bufferC, true, 0, n * sizeof(int32_t), c);
