@@ -19,32 +19,17 @@ template <typename _Ty, typename _Fn>
 void clArrayTest(_Ty * a, _Ty * b, _Ty * c, uint32_t n, _Fn f) {
   for (uint32_t i = 0; i < n; ++i) {
     if (f(a[i], b[i], c[i], i)) {
-      cout << "clTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")" << endl;
+      cerr << "clTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")" << endl;
       break;
     }
   }
 }
 
-template <typename _Ty, typename _Fn>
-void clArrayInit(_Ty * a, _Ty * b, _Ty * c, uint32_t n, _Fn f) {
-  for (uint32_t i = 0; i < n; ++i) {
-    auto v = f(i);
-    while (v.size() < 3) v.push_back(v[v.size() - 1]);
-    a[i] = v[0];
-    b[i] = v[1];
-    c[i] = v[2];
-  }
-  clArrayTest(a, b, c, n, [&f](int32_t a, int32_t b, int32_t c, int32_t i) {
-    auto v = f(i);
-    while (v.size() < 3) v.push_back(v[v.size() - 1]);
-    return (a != v[0]) || (b != v[1]) || (c != v[2]);
-  });
-}
-
 int main() {
-  try {
-    cout << "clMain: Hello OpenCL!" << endl;
+  cout << "clMain: Hello OpenCL!" << endl;
+  cerr << "\033[1m";
 
+  try {
     vector<Device> devices;
     vector<Platform> platforms;
     Platform::get(&platforms);
@@ -95,7 +80,7 @@ int main() {
       cout << "clTest     : ========== NEW ==========" << endl;
       TIME_A(time);
 
-      clArrayInit(a, b, c, n, [](int32_t i) { return vector<int32_t>{-1}; });
+      for (uint32_t i = 0; i < n; ++i) { a[i] = b[i] = c[i] = -1; }
       cout << "clTest     : array init (-1, -1, -1)" << endl;
 
       Buffer bufferA(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | bufferArgs.first, n * sizeof(int32_t), bufferArgs.second);
@@ -121,24 +106,30 @@ int main() {
       CommandQueue commandQueue(context, devices[0]);
 
       int32_t * a_ = (int32_t *)commandQueue.enqueueMapBuffer(bufferA, true, CL_MAP_WRITE_INVALIDATE_REGION, 0, n * sizeof(int32_t));
+      if (a_ == nullptr) cerr << "clTestError: a_ NULL" << endl;
       if (a_ == a)
         cout << "clTestMap  : a_ eq a" << endl;
       else
         cout << "clTestMap  : a_ not_eq a" << endl;
 
       TIME_A(init);
-      clArrayInit(a, b, c, n, [](int32_t i) { return vector<int32_t>{i, 1, 0}; });
-      cout << "clTest     : array init (i, 1, 0)" << endl;
+      for (uint32_t i = 0; i < n; ++i) { a[i] = b[i] = c[i] = i; }
+      cout << "clTest     : array init (i, i, i)" << endl;
       TIME_B(init);
 
       commandQueue.enqueueNDRangeKernel(kernel, 0, n);
 
-      clArrayInit(a, b, c, n, [](int32_t i) { return vector<int32_t>{0, 0, 0}; });
-      cout << "clTest     : array init (i, 2, 0)" << endl;
+      for (uint32_t i = 0; i < n; ++i) { a[i] = b[i] = c[i] = -2; }
+      cout << "clTest     : array init (-2, -2, -2)" << endl;
 
       commandQueue.enqueueReadBuffer(bufferC, true, 0, n * sizeof(int32_t), c);
 
-      clArrayTest(a, b, c, n, [](int32_t a, int32_t b, int32_t c, int32_t i) { return (a + b == c); });
+      for (uint32_t i = 0; i < n; ++i) {
+        if (a[i] + b[i] != c[i]) {
+          cerr << "clTestError: i/(a, b, c) = " << i << "/(" << a[i] << ", " << b[i] << ", " << c[i] << ")" << endl;
+        }
+      }
+      // clArrayTest(a, b, c, n, [](int32_t a, int32_t b, int32_t c, int32_t i) { return (a + b == c); });
       cout << "clTest     : result" << endl;
 
       TIME_B(time);
@@ -148,5 +139,7 @@ int main() {
     cerr << "clErr: " << e.what() << endl;
     cerr << "clErr: " << e.err() /*<< ", " << cl::clGetErrorName(e.err())*/ << endl;
   }
+
+  cerr << "\033[0m";
   return 0;
 }
