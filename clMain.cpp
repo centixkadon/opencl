@@ -2,6 +2,7 @@
 #define __CL_ENABLE_EXCEPTIONS
 #include <CL/cl.hpp>
 
+#include <algorithm>
 #include <vector>
 
 #include <fstream>
@@ -14,7 +15,31 @@
 using namespace cl;
 using namespace std;
 
-#define cout_a_b_c(index) cout << "index = " << (index) << ": " << a[index] << " + " << b[index] << " = " << c[index] << endl
+template <typename _Ty, typename _Fn>
+void clArrayTest(_Ty * a, _Ty * b, _Ty * c, uint32_t const n, _Fn & f) {
+  for (uint32_t i = 0; i < n; ++i) {
+    if (f(a[i], b[i], c[i], i)) {
+      cout << "clTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")" endl;
+      break;
+    }
+  }
+}
+
+template <typename _Ty, typename _Fn>
+void clArrayInit(_Ty * a, _Ty * b, _Ty * c, uint32_t const n, _Fn & f) {
+  for (uint32_t i = 0; i < n; ++i) {
+    auto v = f(i);
+    while (v.size() < 3) v.push_back(v[v.size() - 1]);
+    a[i] = v[0];
+    b[i] = v[1];
+    c[i] = v[2];
+  }
+  clArrayTest(a, b, c, n, [&f](int32_t a, int32_t b, int32_t c, int32_t i) {
+    auto v = f(i);
+    while (v.size() < 3) v.push_back(v[v.size() - 1]);
+    return (a != v[0]) || (b != v[1]) || (c != v[2]);
+  });
+}
 
 int main() {
   try {
@@ -52,61 +77,73 @@ int main() {
     int32_t * a = new int32_t[n];
     int32_t * b = new int32_t[n];
     int32_t * c = new int32_t[n];
-    for (uint32_t i = 0; i < n; ++i) { a[i] = 9; }
-    for (uint32_t i = 0; i < n; ++i) { b[i] = 8; }
-    for (uint32_t i = 0; i < n; ++i) { c[i] = 7; }
-
-    //cout_a_b_c(0); cout_a_b_c(n-1);
+    int32_t val = -2;
 
     TIME_A(zero);
     TIME_B(zero);
 
-    TIME_A(time);
-
     Context context(devices);
 
-    //    Buffer bufferA(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(int32_t), a);
-    Buffer bufferA(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR, n * sizeof(int32_t), nullptr);
-    Buffer bufferB(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(int32_t), b);
-    Buffer bufferC(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, n * sizeof(int32_t), nullptr);
+    vector<pair<cl_mem_flags, int32_t *>> bufferArgses = {
+        {CL_MEM_USE_HOST_PTR, a},
+        {CL_MEM_ALLOC_HOST_PTR, a},
+        {CL_MEM_ALLOC_HOST_PTR, nullptr},
+        {CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, a},
+        {CL_MEM_COPY_HOST_PTR, a},
+    };
 
-    string sources;
-    vector<string> sourceFileNames = {"clMain.cl"};
-    for (auto & sourceFileName : sourceFileNames) {
-      ifstream fs(sourceFileName, ios::binary);
-      sources += string(istreambuf_iterator<char>(fs), istreambuf_iterator<char>());
+    for (auto & bufferArgs : bufferArgses) {
+      cout << "clTest     : ========== NEW ==========" << endl;
+      TIME_A(time);
+
+      clArrayInit(a, b, c, n, [](int32_t i) { return vector<int32_t>{-1}; });
+      cout << "clTest     : array init (-1, -1, -1)" << endl;
+
+      Buffer bufferA(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | bufferArgs.first, n * sizeof(int32_t), bufferArgs.second);
+      Buffer bufferB(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(int32_t), b);
+      Buffer bufferC(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, n * sizeof(int32_t), nullptr);
+
+      string sources;
+      vector<string> sourceFileNames = {"clMain.cl"};
+      for (auto & sourceFileName : sourceFileNames) {
+        ifstream fs(sourceFileName, ios::binary);
+        sources += string(istreambuf_iterator<char>(fs), istreambuf_iterator<char>());
+      }
+
+      Program program(context, sources);
+      program.build(devices);
+
+      Kernel kernel(program, "clMain");
+      kernel.setArg(0, bufferC);
+      kernel.setArg(1, bufferA);
+      kernel.setArg(2, bufferB);
+      kernel.setArg(3, n);
+
+      CommandQueue commandQueue(context, devices[0]);
+
+      int32_t * a_ = (int32_t *)commandQueue.enqueueMapBuffer(bufferA, true, CL_MAP_WRITE_INVALIDATE_REGION, 0, n * sizeof(int32_t));
+      if (a_ == a)
+        cout << "clTestMap  : a_ eq a" << endl;
+      else
+        cout << "clTestMap  : a_ not_eq a" << endl;
+
+      TIME_A(init);
+      clArrayInit(a, b, c, n, [](int32_t i) { return vector<int32_t>{i, 1, 0}; });
+      cout << "clTest     : array init (i, 1, 0)" << endl;
+      TIME_B(init);
+
+      commandQueue.enqueueNDRangeKernel(kernel, 0, n);
+
+      clArrayInit(a, b, c, n, [](int32_t i) { return vector<int32_t>{i, 2, 0}; });
+      cout << "clTest     : array init (i, 2, 0)" << endl;
+
+      commandQueue.enqueueReadBuffer(bufferC, true, 0, n * sizeof(int32_t), c);
+
+      clArrayTest(a, b, c, n, [](int32_t a, int32_t b, int32_t c, int32_t i) { return (a + b == c); });
+      cout << "clTest     : result" << endl;
+
+      TIME_B(time);
     }
-
-    Program program(context, sources);
-    program.build(devices);
-
-    Kernel kernel(program, "clMain");
-    kernel.setArg(0, bufferC);
-    kernel.setArg(1, bufferA);
-    kernel.setArg(2, bufferB);
-    kernel.setArg(3, n);
-
-    CommandQueue commandQueue(context, devices[0]);
-
-    a = (int32_t *)commandQueue.enqueueMapBuffer(bufferA, true, CL_MAP_WRITE_INVALIDATE_REGION, 0, n * sizeof(int32_t));
-    TIME_A(init);
-    for (uint32_t i = 0; i < n; ++i) { a[i] = i; }
-    for (uint32_t i = 0; i < n; ++i) { b[i] = 1; }
-    for (uint32_t i = 0; i < n; ++i) { c[i] = 0; }
-    TIME_B(init);
-
-    commandQueue.enqueueNDRangeKernel(kernel, 0, n);
-
-    for (uint32_t i = 0; i < n; ++i) { a[i] = i; }
-    for (uint32_t i = 0; i < n; ++i) { b[i] = 0; }
-    for (uint32_t i = 0; i < n; ++i) { c[i] = 0; }
-
-    commandQueue.enqueueReadBuffer(bufferC, true, 0, n * sizeof(int32_t), c);
-
-    cout_a_b_c(0);
-    cout_a_b_c(n - 1);
-
-    TIME_B(time);
 
   } catch (Error & e) {
     cerr << "clErr: " << e.what() << endl;
