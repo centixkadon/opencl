@@ -9,16 +9,16 @@
 #define TIME_A(str)          \
   LARGE_INTEGER t_##str##_a; \
   QueryPerformanceCounter(&t_##str##_a);
-#define TIME_B(str)                                                                      \
-  LARGE_INTEGER t_##str##_b;                                                             \
-  QueryPerformanceCounter(&t_##str##_b);                                                 \
-  string t_##str##_s = #str;                                                             \
-  double t_##str;                                                                        \
-  {                                                                                      \
-    LARGE_INTEGER t_##str##_c;                                                           \
-    QueryPerformanceFrequency(&t_##str##_c);                                             \
-    t_##str = 1.0 * (t_##str##_b.QuadPart - t_##str##_a.QuadPart) / t_##str##_c.QuadPart \
-  }                                                                                      \
+#define TIME_B(str)                                                                       \
+  LARGE_INTEGER t_##str##_b;                                                              \
+  QueryPerformanceCounter(&t_##str##_b);                                                  \
+  string t_##str##_s = #str;                                                              \
+  double t_##str;                                                                         \
+  {                                                                                       \
+    LARGE_INTEGER t_##str##_c;                                                            \
+    QueryPerformanceFrequency(&t_##str##_c);                                              \
+    t_##str = 1.0 * (t_##str##_b.QuadPart - t_##str##_a.QuadPart) / t_##str##_c.QuadPart; \
+  }                                                                                       \
   cout << #str << string(20 - t_##str##_s.size(), ' ') << " : " << t_##str << endl;
 #elif defined(__linux__) || defined(__linux)
 #define TIME_A(str)            \
