@@ -19,7 +19,7 @@ template <typename _Ty, typename _Fn>
 void clArrayTest(_Ty * a, _Ty * b, _Ty * c, uint32_t n, _Fn f) {
   for (uint32_t i = 0; i < n; ++i) {
     if (f(a[i], b[i], c[i], i)) {
-      cerr << "\e[1mclTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
+      cerr << "\e[1;31mclTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
       break;
     }
   }
@@ -57,7 +57,7 @@ int main() {
     }
 
     uint32_t const n = 1000001;
-    //uint32_t const n = 100000001;
+    // uint32_t const n = 100000001;
     int32_t * a = new int32_t[n];
     int32_t * b = new int32_t[n];
     int32_t * c = new int32_t[n];
@@ -106,32 +106,38 @@ int main() {
 
       int32_t * a_ = (int32_t *)commandQueue.enqueueMapBuffer(bufferA, true, CL_MAP_WRITE_INVALIDATE_REGION, 0, n * sizeof(int32_t));
       if (a_ == nullptr)
-        cerr << "\e[1mclTestError: a_ NULL\e[0m" << endl;
+        cerr << "\e[1;31mclTestError: a_ NULL\e[0m" << endl;
       if (a_ == a)
         cout << "clTestMap  : a_ eq a" << endl;
       else
         cout << "clTestMap  : a_ not_eq a" << endl;
 
       TIME_A(init);
-      for (uint32_t i = 0; i < n; ++i) { a[i] = b[i] = c[i] = i; }
+      for (uint32_t i = 0; i < n; ++i) { b[i] = c[i] = i, a[i] = 1, a_[i] = 2; }
       cout << "clTest     : array init (i, i, i)" << endl;
       TIME_B(init);
 
       commandQueue.enqueueNDRangeKernel(kernel, 0, n);
 
-      for (uint32_t i = 0; i < n; ++i) { a[i] = b[i] = c[i] = -2; }
-      cout << "clTest     : array init (-2, -2, -2)" << endl;
+      // for (uint32_t i = 0; i < n; ++i) { a[i] = b[i] = c[i] = -2; }
+      // cout << "clTest     : array init (-2, -2, -2)" << endl;
 
       commandQueue.enqueueReadBuffer(bufferC, true, 0, n * sizeof(int32_t), c);
 
+      bool t = true, t_ = true;
       for (uint32_t i = 0; i < n; ++i) {
-        if (i + i != c[i]) {
-          cerr << "\e[1mclTestError: i/(a, b, c) = " << i << "/(" << a[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
-          break;
-        }
+        t &= (a[i] + b[i] == c[i]);
+        t_ &= (a_[i] + b[i] == c[i]);
+      }
+      if (t) {
+        cout << "clTest     : result match b+a" << endl;
+      } else if (t_) {
+        cout << "clTest     : result match b+a_" << endl;
+      } else {
+        cerr << "\e[1;31mclTestError: result not match\e[0m" << endl;
+        // cerr << "\e[1;31mclTestError: i/(a, b, c) = " << i << "/(" << a[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
       }
       // clArrayTest(a, b, c, n, [](int32_t a, int32_t b, int32_t c, int32_t i) { return (a + b == c); });
-      cout << "clTest     : result" << endl;
 
       TIME_B(time);
     }
