@@ -19,7 +19,7 @@ template <typename _Ty, typename _Fn>
 void clArrayTest(_Ty * a, _Ty * b, _Ty * c, uint32_t n, _Fn f) {
   for (uint32_t i = 0; i < n; ++i) {
     if (f(a[i], b[i], c[i], i)) {
-      cerr << "clTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")" << endl;
+      cerr << "\e[1mclTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
       break;
     }
   }
@@ -27,7 +27,6 @@ void clArrayTest(_Ty * a, _Ty * b, _Ty * c, uint32_t n, _Fn f) {
 
 int main() {
   cout << "clMain: Hello OpenCL!" << endl;
-  cerr << "\033[1m";
 
   try {
     vector<Device> devices;
@@ -106,7 +105,8 @@ int main() {
       CommandQueue commandQueue(context, devices[0]);
 
       int32_t * a_ = (int32_t *)commandQueue.enqueueMapBuffer(bufferA, true, CL_MAP_WRITE_INVALIDATE_REGION, 0, n * sizeof(int32_t));
-      if (a_ == nullptr) cerr << "clTestError: a_ NULL" << endl;
+      if (a_ == nullptr)
+        cerr << "\e[1mclTestError: a_ NULL\e[0m" << endl;
       if (a_ == a)
         cout << "clTestMap  : a_ eq a" << endl;
       else
@@ -125,8 +125,9 @@ int main() {
       commandQueue.enqueueReadBuffer(bufferC, true, 0, n * sizeof(int32_t), c);
 
       for (uint32_t i = 0; i < n; ++i) {
-        if (a[i] + b[i] != c[i]) {
-          cerr << "clTestError: i/(a, b, c) = " << i << "/(" << a[i] << ", " << b[i] << ", " << c[i] << ")" << endl;
+        if (i + i != c[i]) {
+          cerr << "\e[1mclTestError: i/(a, b, c) = " << i << "/(" << a[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
+          break;
         }
       }
       // clArrayTest(a, b, c, n, [](int32_t a, int32_t b, int32_t c, int32_t i) { return (a + b == c); });
@@ -140,6 +141,5 @@ int main() {
     cerr << "clErr: " << e.err() /*<< ", " << cl::clGetErrorName(e.err())*/ << endl;
   }
 
-  cerr << "\033[0m";
   return 0;
 }
