@@ -63,6 +63,12 @@ int main(int argc, char * argv[]) {
       cout << "clDeviceMaxWorkItemSizes: " << device.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>() << endl;
       cout << "clDeviceMaxWorkGroupSize: " << device.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << endl;
     }
+    cout << endl;
+
+    if (is_map)
+      cout << "clTestMap  : is map" << endl;
+    else
+      cout << "clTestMap  : is not map" << endl;
 
     uint32_t const n = 1000001;
     // uint32_t const n = 100000001;
@@ -80,11 +86,11 @@ int main(int argc, char * argv[]) {
       int32_t * host_ptr;
     };
     vector<BufferArgs> bufferArgses = {
-        {CL_MEM_USE_HOST_PTR, a},
-        {CL_MEM_ALLOC_HOST_PTR, a},
-        // {CL_MEM_ALLOC_HOST_PTR, nullptr},
-        // {CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, a},
-        {CL_MEM_COPY_HOST_PTR, a},
+        {CL_MEM_USE_HOST_PTR, a},                          // a_ == a
+        {CL_MEM_ALLOC_HOST_PTR, a},                        // fail
+        {CL_MEM_ALLOC_HOST_PTR, nullptr},                  // fail
+        {CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, a}, // a_ != a; can copy, map, edit
+        {CL_MEM_COPY_HOST_PTR, a},                         // a_ != a; can copy, map, edit
     };
 
     for (auto & bufferArgs : bufferArgses) {
@@ -144,9 +150,15 @@ int main(int argc, char * argv[]) {
         t_ &= (a_[i] + b[i] == c[i]);
         t_a &= (a[i] == a_[i]);
       }
-      if (t) cout << "clTest     : result match b+a" << endl;
+      if (t)
+        cout << "clTest     : result match b+a" << endl;
+      else
+        cout << "clTest     : result not match b+a" << endl;
       if (is_map) {
-        if (t_) cout << "clTest     : result match b+a_" << endl;
+        if (t_)
+          cout << "clTest     : result match b+a_" << endl;
+        else
+          cout << "clTest     : result not match b+a_" << endl;
         if (!t && !t_) {
           cerr << "\e[1;31mclTestError: result not match\e[0m" << endl;
           uint32_t i = 100;
@@ -156,6 +168,8 @@ int main(int argc, char * argv[]) {
           cout << "clTest     : a match a_" << endl;
         else
           cout << "clTest     : a not match a_" << endl;
+      } else {
+        if (!t) cout << "\e[1;31mclTestError: result not match b+a\e[0m" << endl;
       }
 
       TIME_B(clTimeAll);
