@@ -7,6 +7,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <sstream>
 
 #define _TIME_DIFF_STRLEN 11
 #include "util/time_diff.h"
@@ -26,8 +27,14 @@ void clArrayTest(_Ty * a, _Ty * b, _Ty * c, uint32_t n, _Fn f) {
   }
 }
 
-int main() {
+int main(int argc, char * argv[]) {
   cout << "clMain: Hello OpenCL!" << endl;
+
+  bool is_map = true;
+  if (argc > 1) {
+    stringstream ss(argv[1]);
+    ss >> is_map;
+  }
 
   try {
     vector<Device> devices;
@@ -68,11 +75,15 @@ int main() {
 
     Context context(devices);
 
-    vector<pair<uint64_t, int32_t *>> bufferArgses = {
+    struct BufferArgs {
+      uint64_t flags;
+      int32_t * host_ptr;
+    };
+    vector<BufferArgs> bufferArgses = {
         {CL_MEM_USE_HOST_PTR, a},
         {CL_MEM_ALLOC_HOST_PTR, a},
-        {CL_MEM_ALLOC_HOST_PTR, nullptr},
-        {CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, a},
+        // {CL_MEM_ALLOC_HOST_PTR, nullptr},
+        // {CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, a},
         {CL_MEM_COPY_HOST_PTR, a},
     };
 
@@ -86,7 +97,7 @@ int main() {
       cout << "clTest     : array init (a 1)" << endl;
       TIME_B(clTimeInit1);
 
-      Buffer bufferA(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | bufferArgs.first, n * sizeof(int32_t), bufferArgs.second);
+      Buffer bufferA(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | bufferArgs.flags, n * sizeof(int32_t), bufferArgs.host_ptr);
       Buffer bufferB(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(int32_t), b);
       Buffer bufferC(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, n * sizeof(int32_t), nullptr);
 
@@ -108,43 +119,44 @@ int main() {
 
       CommandQueue commandQueue(context, devices[0]);
 
-      // int32_t * a_ = (int32_t *)commandQueue.enqueueMapBuffer(bufferA, true, CL_MAP_WRITE_INVALIDATE_REGION, 0, n * sizeof(int32_t));
       int32_t * a_ = (int32_t *)commandQueue.enqueueMapBuffer(bufferA, true, CL_MAP_WRITE, 0, n * sizeof(int32_t));
-      if (a_ == nullptr)
-        cerr << "\e[1;31mclTestError: a_ NULL\e[0m" << endl;
-      if (a_ == a)
-        cout << "clTestMap  : a_ eq a" << endl;
-      else {
-        cout << "clTestMap  : a_(" << (uint64_t)a_ << ") not_eq a(" << (uint64_t)a << ")" << endl;
+      if (is_map) {
+        if (a_ == nullptr)
+          cerr << "\e[1;31mclTestError: a_ NULL\e[0m" << endl;
+        if (a_ == a)
+          cout << "clTestMap  : a_ eq a" << endl;
+        else {
+          cout << "clTestMap  : a_(" << (uint64_t)a_ << ") not_eq a(" << (uint64_t)a << ")" << endl;
 
-        TIME_A(clTimeInit2);
-        for (uint32_t i = 0; i < n; ++i) { a_[i] = 2; }
-        cout << "clTest     : array init (a_ 2)" << endl;
-        TIME_B(clTimeInit2);
+          TIME_A(clTimeInit2);
+          for (uint32_t i = 0; i < n; ++i) { a_[i] = 2; }
+          cout << "clTest     : array init (a_ 2)" << endl;
+          TIME_B(clTimeInit2);
+        }
       }
 
       commandQueue.enqueueNDRangeKernel(kernel, 0, n);
-
-      // for (uint32_t i = 0; i < n; ++i) { a[i] = b[i] = c[i] = -2; }
-      // cout << "clTest     : array init (-2, -2, -2)" << endl;
-
       commandQueue.enqueueReadBuffer(bufferC, true, 0, n * sizeof(int32_t), c);
 
-      bool t = true, t_ = true;
+      bool t = true, t_ = true, t_a = true;
       for (uint32_t i = 0; i < n; ++i) {
         t &= (a[i] + b[i] == c[i]);
         t_ &= (a_[i] + b[i] == c[i]);
+        t_a &= (a[i] == a_[i]);
       }
-      if (t) {
-        cout << "clTest     : result match b+a" << endl;
-      } else if (t_) {
-        cout << "clTest     : result match b+a_" << endl;
-      } else {
-        cerr << "\e[1;31mclTestError: result not match\e[0m" << endl;
-        uint32_t i = 100;
-        cerr << "\e[1;31mclTestError: i(a/a_, b, c) = " << i << "(" << a[i] << "/" << a_[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
+      if (t) cout << "clTest     : result match b+a" << endl;
+      if (is_map) {
+        if (t_) cout << "clTest     : result match b+a_" << endl;
+        if (!t && !t_) {
+          cerr << "\e[1;31mclTestError: result not match\e[0m" << endl;
+          uint32_t i = 100;
+          cerr << "\e[1;31mclTestError: i(a/a_, b, c) = " << i << "(" << a[i] << "/" << a_[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
+        }
+        if (t_a)
+          cout << "clTest     : a match a_" << endl;
+        else
+          cout << "clTest     : a not match a_" << endl;
       }
-      // clArrayTest(a, b, c, n, [](int32_t a, int32_t b, int32_t c, int32_t i) { return (a + b == c); });
 
       TIME_B(clTimeAll);
     }
