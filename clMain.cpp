@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 
+#define _TIME_DIFF_STRLEN 11
 #include "util/time_diff.h"
 
 #include "util/stdUtil.hpp"
@@ -62,8 +63,8 @@ int main() {
     int32_t * b = new int32_t[n];
     int32_t * c = new int32_t[n];
 
-    TIME_A(zero);
-    TIME_B(zero);
+    TIME_A(clTimeZero);
+    TIME_B(clTimeZero);
 
     Context context(devices);
 
@@ -77,13 +78,13 @@ int main() {
 
     for (auto & bufferArgs : bufferArgses) {
       cout << "clTest     : ========== NEW ==========" << endl;
-      TIME_A(time);
+      TIME_A(clTimeAll);
 
       for (uint32_t i = 0; i < n; ++i) { b[i] = i, c[i] = 0; }
-      TIME_A(init1);
+      TIME_A(clTimeInit1);
       for (uint32_t i = 0; i < n; ++i) { a[i] = 1; }
       cout << "clTest     : array init (a 1)" << endl;
-      TIME_B(init1);
+      TIME_B(clTimeInit1);
 
       Buffer bufferA(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | bufferArgs.first, n * sizeof(int32_t), bufferArgs.second);
       Buffer bufferB(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(int32_t), b);
@@ -107,18 +108,20 @@ int main() {
 
       CommandQueue commandQueue(context, devices[0]);
 
-      int32_t * a_ = (int32_t *)commandQueue.enqueueMapBuffer(bufferA, true, CL_MAP_WRITE_INVALIDATE_REGION, 0, n * sizeof(int32_t));
+      // int32_t * a_ = (int32_t *)commandQueue.enqueueMapBuffer(bufferA, true, CL_MAP_WRITE_INVALIDATE_REGION, 0, n * sizeof(int32_t));
+      int32_t * a_ = (int32_t *)commandQueue.enqueueMapBuffer(bufferA, true, CL_MAP_WRITE, 0, n * sizeof(int32_t));
       if (a_ == nullptr)
         cerr << "\e[1;31mclTestError: a_ NULL\e[0m" << endl;
       if (a_ == a)
         cout << "clTestMap  : a_ eq a" << endl;
-      else
-        cout << "clTestMap  : a_ not_eq a" << endl;
+      else {
+        cout << "clTestMap  : a_(" << (uint64_t)a_ << ") not_eq a(" << (uint64_t)a << ")" << endl;
 
-      TIME_A(init2);
-      for (uint32_t i = 0; i < n; ++i) { a_[i] = 2; }
-      cout << "clTest     : array init (a_ 2)" << endl;
-      TIME_B(init2);
+        TIME_A(clTimeInit2);
+        for (uint32_t i = 0; i < n; ++i) { a_[i] = 2; }
+        cout << "clTest     : array init (a_ 2)" << endl;
+        TIME_B(clTimeInit2);
+      }
 
       commandQueue.enqueueNDRangeKernel(kernel, 0, n);
 
@@ -143,7 +146,7 @@ int main() {
       }
       // clArrayTest(a, b, c, n, [](int32_t a, int32_t b, int32_t c, int32_t i) { return (a + b == c); });
 
-      TIME_B(time);
+      TIME_B(clTimeAll);
     }
 
   } catch (Error & e) {
