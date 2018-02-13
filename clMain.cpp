@@ -89,8 +89,8 @@ int main(int argc, char * argv[]) {
         {CL_MEM_USE_HOST_PTR, a},                          // a_ == a
         {CL_MEM_ALLOC_HOST_PTR, a},                        // fail
         {CL_MEM_ALLOC_HOST_PTR, nullptr},                  // fail
-        {CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, a}, // a_ != a; can copy, map, edit
-        {CL_MEM_COPY_HOST_PTR, a},                         // a_ != a; can copy, map, edit
+        {CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, a}, // a_ != a; can copy, map, not edit
+        {CL_MEM_COPY_HOST_PTR, a},                         // a_ != a; can copy, map, not edit
     };
 
     for (auto & bufferArgs : bufferArgses) {
@@ -103,7 +103,7 @@ int main(int argc, char * argv[]) {
       cout << "clTest     : array init (a 1)" << endl;
       TIME_B(clTimeInit1);
 
-      Buffer bufferA(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | bufferArgs.flags, n * sizeof(int32_t), bufferArgs.host_ptr);
+      Buffer bufferA(context, CL_MEM_READ_WRITE | 0 | bufferArgs.flags, n * sizeof(int32_t), bufferArgs.host_ptr);
       Buffer bufferB(context, CL_MEM_READ_WRITE | CL_MEM_HOST_WRITE_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(int32_t), b);
       Buffer bufferC(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, n * sizeof(int32_t), nullptr);
 
@@ -139,16 +139,22 @@ int main(int argc, char * argv[]) {
           cout << "clTest     : array init (a_ 2)" << endl;
           TIME_B(clTimeInit2);
         }
+
+        bool t_a = true;
+        for (uint32_t i = 0; i < n; ++i) t_a &= (a[i] == a_[i]);
+        if (t_a)
+          cout << "clTest     : a match a_" << endl;
+        else
+          cout << "clTest     : a not match a_" << endl;
       }
 
       commandQueue.enqueueNDRangeKernel(kernel, 0, n);
       commandQueue.enqueueReadBuffer(bufferC, true, 0, n * sizeof(int32_t), c);
 
-      bool t = true, t_ = true, t_a = true;
+      bool t = true, t_ = true;
       for (uint32_t i = 0; i < n; ++i) {
         t &= (a[i] + b[i] == c[i]);
         t_ &= (a_[i] + b[i] == c[i]);
-        t_a &= (a[i] == a_[i]);
       }
       if (t)
         cout << "clTest     : result match b+a" << endl;
@@ -164,10 +170,6 @@ int main(int argc, char * argv[]) {
           uint32_t i = 100;
           cerr << "\e[1;31mclTestError: i(a/a_, b, c) = " << i << "(" << a[i] << "/" << a_[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
         }
-        if (t_a)
-          cout << "clTest     : a match a_" << endl;
-        else
-          cout << "clTest     : a not match a_" << endl;
       } else {
         if (!t) cout << "\e[1;31mclTestError: result not match b+a\e[0m" << endl;
       }
