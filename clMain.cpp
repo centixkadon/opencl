@@ -134,18 +134,18 @@ int main(int argc, char * argv[]) {
         else {
           cout << "clTestMap  : a_(" << (uint64_t)a_ << ") not_eq a(" << (uint64_t)a << ")" << endl;
 
+          bool t_a = true;
+          for (uint32_t i = 0; i < n; ++i) t_a &= (a[i] == a_[i]);
+          if (t_a)
+            cout << "clTest     : a match a_" << endl;
+          else
+            cout << "clTest     : a not match a_" << endl;
+
           TIME_A(clTimeInit2);
           for (uint32_t i = 0; i < n; ++i) { a_[i] = 2; }
           cout << "clTest     : array init (a_ 2)" << endl;
           TIME_B(clTimeInit2);
         }
-
-        bool t_a = true;
-        for (uint32_t i = 0; i < n; ++i) t_a &= (a[i] == a_[i]);
-        if (t_a)
-          cout << "clTest     : a match a_" << endl;
-        else
-          cout << "clTest     : a not match a_" << endl;
       }
 
       commandQueue.enqueueNDRangeKernel(kernel, 0, n);
