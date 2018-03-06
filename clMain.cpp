@@ -86,11 +86,11 @@ int main(int argc, char * argv[]) {
       int32_t * host_ptr;
     };
     vector<BufferArgs> bufferArgses = {
-        {CL_MEM_USE_HOST_PTR, a},                          // a_ == a
-        {CL_MEM_ALLOC_HOST_PTR, a},                        // fail
-        {CL_MEM_ALLOC_HOST_PTR, nullptr},                  // fail
-        {CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, a}, // a_ != a; can copy, map, not edit
-        {CL_MEM_COPY_HOST_PTR, a},                         // a_ != a; can copy, map, not edit
+      {CL_MEM_USE_HOST_PTR, a},                          // a_ == a
+      {CL_MEM_ALLOC_HOST_PTR, a},                        // fail
+      {CL_MEM_ALLOC_HOST_PTR, nullptr},                  // fail
+      {CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, a}, // a_ != a; can copy, map, not edit
+      {CL_MEM_COPY_HOST_PTR, a},                         // a_ != a; can copy, map, not edit
     };
 
     for (auto & bufferArgs : bufferArgses) {
