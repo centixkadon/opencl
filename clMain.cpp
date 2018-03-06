@@ -10,18 +10,22 @@
 #include <sstream>
 
 #define _TIME_DIFF_STRLEN 11
-#include "util/time_diff.h"
-
-#include "util/stdUtil.hpp"
+#include "util/chrono"
+#include "util/iostream"
 
 using namespace cl;
 using namespace std;
+
+template <class _Elem, class _Traits>
+inline basic_ostream<_Elem, _Traits> & mark(basic_ostream<_Elem, _Traits> & _Ostr) {
+  return _Ostr << bold << red;
+}
 
 template <typename _Ty, typename _Fn>
 void clArrayTest(_Ty * a, _Ty * b, _Ty * c, uint32_t n, _Fn f) {
   for (uint32_t i = 0; i < n; ++i) {
     if (f(a[i], b[i], c[i], i)) {
-      cerr << "\e[1;31mclTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << endl;
+      cerr << mark << "clTestError: (i, a, b, c) = (" << i << ", " << a[i] << ", " << b[i] << ", " << c[i] << ")\e[0m" << reset << endl;
       break;
     }
   }
